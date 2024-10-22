@@ -12,13 +12,12 @@ contract EncryptedTokens is Ownable, Permissioned {
     mapping(address => bool) public authorizedContracts;
 
     event TokenCreated(string tokenType, address tokenAddress);
-    event BalanceChecked(address indexed checker, address indexed target, string tokenType, uint256 amount);
     event ContractAuth(address indexed contractAddress);
-    event TokensMinted(string tokenType, address to, uint256 amount);
+    event TokensTransferred(string tokenType, address from, address to, euint32 amount);
 
     bytes public fhePubKey;
 
-    constructor(bytes memory _fhePubKey) Ownable(msg.sender) {
+    constructor(bytes memory _fhePubKey) {
         fhePubKey = _fhePubKey;
         createTokens();
     }
@@ -28,81 +27,51 @@ contract EncryptedTokens is Ownable, Permissioned {
     }
 
     function createTokens() internal {
-        YesToken yesToken = new YesToken();
-        NoToken noToken = new NoToken();
+        tokenAddresses["Yes"] = address(new YesToken());
+        tokenAddresses["No"] = address(new NoToken());
 
-        tokenAddresses["Yes"] = address(yesToken);
-        tokenAddresses["No"] = address(noToken);
-
-        emit TokenCreated("Yes", address(yesToken));
-        emit TokenCreated("No", address(noToken));
+        emit TokenCreated("Yes", tokenAddresses["Yes"]);
+        emit TokenCreated("No", tokenAddresses["No"]);
     }
 
-    // function mintEncrypted(string memory tokenType, address to, inEuint32 calldata amount, Permission calldata perm) public onlySender(perm) {
-    //     ERC20 token = ERC20(tokenAddresses[tokenType]);
-    //     token.mint(to, FHE.decrypt(amount));
-    //     _encryptedBalances[to][tokenType] += amount;
-    //     emit TokensMinted(tokenType, to, FHE.decrypt(amount));
-    // }
 
-    function transferEncrypted(string memory tokenType, address to, euint32 amount) public {
-        require(tokenAddresses[tokenType] != address(0), "Token does not exist");
+    function transferEncrypted(string memory tokenType, address to, euint32 amount) public onlyAuthContract {
+        address tokenAddress = tokenAddresses[tokenType];
+        require(tokenAddress != address(0), "Token does not exist");
+
         FHE.req(FHE.gte(_encryptedBalances[msg.sender][tokenType], amount));
 
-        _encryptedBalances[msg.sender][tokenType].sub(amount);
-        _encryptedBalances[to][tokenType].add(amount);
-    }
+        _encryptedBalances[msg.sender][tokenType] = FHE.sub(_encryptedBalances[msg.sender][tokenType], amount);
+        _encryptedBalances[to][tokenType] = FHE.add(_encryptedBalances[to][tokenType], amount);
 
+        emit TokensTransferred(tokenType, msg.sender, to, amount);
+    }
 
     function allowContract(address contractAddress) public onlyOwner {
         authorizedContracts[contractAddress] = true;
         emit ContractAuth(contractAddress);
     }
 
-    // function checkBalanceEncrypted(address account, string memory tokenType) public view onlyAuthContract returns (inEuint32 memory) {
-    //     return FHE.asEuint32(_encryptedBalances[account][tokenType]);
-    // }
+  
+    function mint(string memory tokenType, address to, uint256 amount) public onlyOwner {
+        ERC20(tokenAddresses[tokenType]).mint(to, amount);
+    }
 
-    // function revealBalanceEncrypted(address account, string memory tokenType, Permission calldata perm) public onlyOwner onlySender(perm) view returns (uint256) {
-    //     euint32 encryptedBalance = _encryptedBalances[account][tokenType];
-    //     return FHE.decrypt(encryptedBalance);
-    // }
-
-    // function wrap(string memory tokenType, uint256 amount) public {
-    //     address tokenAddress = tokenAddresses[tokenType];
-    //     require(tokenAddress != address(0), "Token type does not exist");
-
-    //     ERC20 token = ERC20(tokenAddress);
-    //     require(token.balanceOf(msg.sender) >= amount, "Not enough tokens to wrap");
-
-    //     token.transferFrom(msg.sender, address(this), amount);
-    //     euint32 encryptedAmount = FHE.asEuint32(amount);
-    //     _encryptedBalances[msg.sender][tokenType] += encryptedAmount;
-    // }
-
-    // function unwrap(string memory tokenType, inEuint32 calldata encryptedAmount, Permission calldata perm) public onlySender(perm) {
-    //     euint32 amount = encryptedAmount;
-    //     require(FHE.decrypt(_encryptedBalances[msg.sender][tokenType]) >= FHE.decrypt(amount), "Insufficient encrypted balance");
-
-    //     _encryptedBalances[msg.sender][tokenType] -= amount;
-    //     ERC20(tokenAddresses[tokenType]).transfer(msg.sender, FHE.decrypt(amount));
-    // }
-
-    // function mintTokens(string memory tokenType, address to, uint256 amount) public onlyOwner {
-    //     ERC20 token = ERC20(tokenAddresses[tokenType]);
-    //     token.mint(to, amount);
-    //     emit TokensMinted(tokenType, to, amount);
-    // }
+    
+    function checkBalanceEncrypted(string memory tokenType, address account) public view onlyAuthContract returns (euint32) {
+        return _encryptedBalances[account][tokenType];
+    }
 
     modifier onlyAuthContract {
-        require(authorizedContracts[tx.origin], "Only authorized contracts can query");
+        require(authorizedContracts[tx.origin], "Only authorized contracts can call");
         _;
     }
 }
 
+// YesToken 
 contract YesToken is ERC20, Ownable {
-    constructor() ERC20("Yes", "YES") Ownable(msg.sender) {
-        _mint(msg.sender, 1000000 * 10 ** uint(decimals()));
+    constructor() ERC20("YesToken", "YES") Ownable(msg.sender) {
+        _mint(msg.sender, 1000000 * 10 ** decimals());
     }
 
     function mint(address to, uint256 amount) public onlyOwner {
@@ -110,9 +79,10 @@ contract YesToken is ERC20, Ownable {
     }
 }
 
+// NoToken 
 contract NoToken is ERC20, Ownable {
-    constructor() ERC20("No", "NO") Ownable(msg.sender) {
-        _mint(msg.sender, 1000000 * 10 ** uint(decimals()));
+    constructor() ERC20("NoToken", "NO") Ownable(msg.sender) {
+        _mint(msg.sender, 1000000 * 10 ** decimals());
     }
 
     function mint(address to, uint256 amount) public onlyOwner {
