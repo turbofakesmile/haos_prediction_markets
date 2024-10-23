@@ -24,7 +24,6 @@ struct OrderInput {
 	inEbool side; // 0 if buy, 1 if sell
 	inEncUint amount; // A if side=0, B if side=1
     inEncUint price;
-	address creator;
 
 }
 
@@ -33,26 +32,48 @@ contract OrderBook {
     mapping(uint256 => Order) public orders;
     mapping(uint256 => uint256) public ordersExist;
 
-    EncryptedTokens public tokenA;
-    EncryptedTokens public tokenB;
+    EncryptedTokens public encryptedTokens;
 
-    constructor() {
-        
+    string constant public tokenAName = "Yes";
+    string constant public tokenBName = "USD";
+
+    constructor(address _encryptedTokens) {
+        encryptedTokens = EncryptedTokens(_encryptedTokens);
     }
     
     function placeOrder(OrderInput calldata order, uint256 id) public {
         if (ordersExist[id] != 0) return;
         ordersExist[id] = 1;
-        // EncryptedErc20.transfer(side, amountMake, address(this));
         orders[id] = Order(
             FHE.asEbool(order.side),
             FHE.asEuint32(order.amount),
             FHE.asEuint32(order.price),
-            order.creator
+            msg.sender
         );
+        // // if order is buy, transfer B to this contract
+        // encryptedTokens.transferEncrypted(
+        //     tokenBName,
+        //     msg.sender,
+        //     FHE.mul(
+        //         FHE.asEuint32(
+        //             FHE.not(orders[id].side)),
+        //             orders[id].amount
+        //         )
+        // );
+        // // if order is sell, transfer A to this contract
+        // encryptedTokens.transferEncrypted(
+        //     tokenAName,
+        //     msg.sender,
+        //     FHE.mul(
+        //         FHE.asEuint32(
+        //             orders[id].side),
+        //             orders[id].amount
+        //         )
+        // );
     }
 
     function matchOrders(uint256 takerOrderId, uint256 makerOrderId) public {
+
         require(ordersExist[takerOrderId] != 0, "Taker does not exist");
         require(ordersExist[makerOrderId] != 0, "Maker does not exist");
 
@@ -60,13 +81,14 @@ contract OrderBook {
         Order memory makerOrder = orders[makerOrderId];
 
         ebool sidesDifferent = FHE.ne(takerOrder.side, makerOrder.side);
+
         ebool makerOrderNotFilled = FHE.gt(makerOrder.amount, FHE.asEuint32(0));
         ebool takerOrderNotFilled = FHE.gt(takerOrder.amount, FHE.asEuint32(0));
 
         ebool takerPriceEqual = FHE.eq(takerOrder.price, makerOrder.price);
         ebool takerPriceHigher = FHE.gt(takerOrder.price, makerOrder.price);
 
-        encUint price = FHE.min(takerOrder.price, makerOrder.price);
+        // encUint price = FHE.min(takerOrder.price, makerOrder.price);
 
         ebool orderCanBeFilled = FHE.or(
             takerPriceEqual, 
@@ -76,15 +98,11 @@ contract OrderBook {
         );
         
         FHE.req(
-            FHE.eq(
-                FHE.and(
-                    FHE.and(makerOrderNotFilled, takerOrderNotFilled),
-                    FHE.and(sidesDifferent, orderCanBeFilled)
-                ),
-                FHE.asEbool(1)
+            FHE.and(
+                FHE.and(makerOrderNotFilled, takerOrderNotFilled),
+                FHE.and(sidesDifferent, orderCanBeFilled)
             )
         );
-
         // // fill order
 
         encUint amount = FHE.min(takerOrder.amount, makerOrder.amount);
@@ -94,24 +112,31 @@ contract OrderBook {
         // EncryptedErc20.transfer(side^1, takerTakeAmount, takerOrder.creator);
         // EncryptedErc20.transfer(side, takerMakeAmount, makerOrder.creator);
 
-        // if taker is buy, taker takes A
-        tokenA.transferEncrypted("Yes", takerOrder.creator, FHE.mul(amount, FHE.asEuint32(makerOrder.side)));
-        // if taker is sell, maker takes A
-        tokenA.transferEncrypted("Yes", makerOrder.creator, FHE.mul(amount, FHE.asEuint32(takerOrder.side)));
-        // if taker is buy, maker takes B
-        tokenB.transferEncrypted("Yes", makerOrder.creator, 
-            FHE.mul(
-                amount, 
-                FHE.mul(price, FHE.asEuint32(makerOrder.side))
-            )
-        );
-        // if taker is sell, taker takes B
-        tokenB.transferEncrypted("Yes", takerOrder.creator, 
-            FHE.mul(
-                amount, 
-                FHE.mul(price, FHE.asEuint32(takerOrder.side))
-            )
-        );
+        // // if taker is buy, taker takes A
+        // encryptedTokens.transferEncrypted(
+        //     tokenAName, 
+        //     takerOrder.creator, 
+        //     FHE.mul(amount, FHE.asEuint32(makerOrder.side))
+        // );
+        // // if taker is sell, maker takes A
+        // encryptedTokens.transferEncrypted(
+        //     tokenAName, 
+        //     makerOrder.creator, FHE.mul(amount, FHE.asEuint32(takerOrder.side))
+        // );
+        // // if taker is buy, maker takes B
+        // encryptedTokens.transferEncrypted(tokenBName, makerOrder.creator, 
+        //     FHE.mul(
+        //         amount, 
+        //         FHE.mul(price, FHE.asEuint32(makerOrder.side))
+        //     )
+        // );
+        // // if taker is sell, taker takes B
+        // encryptedTokens.transferEncrypted(tokenBName, takerOrder.creator, 
+        //     FHE.mul(
+        //         amount, 
+        //         FHE.mul(price, FHE.asEuint32(takerOrder.side))
+        //     )
+        // );
 
         orders[takerOrderId] = takerOrder;
         orders[makerOrderId] = makerOrder;

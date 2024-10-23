@@ -17,7 +17,7 @@ contract EncryptedTokens is Ownable, Permissioned {
 
     bytes public fhePubKey;
 
-    constructor(bytes memory _fhePubKey) {
+    constructor(bytes memory _fhePubKey) Ownable(msg.sender){
         fhePubKey = _fhePubKey;
         createTokens();
     }
@@ -29,11 +29,12 @@ contract EncryptedTokens is Ownable, Permissioned {
     function createTokens() internal {
         tokenAddresses["Yes"] = address(new YesToken());
         tokenAddresses["No"] = address(new NoToken());
+        tokenAddresses["USD"] = address(new UsdToken());
 
         emit TokenCreated("Yes", tokenAddresses["Yes"]);
         emit TokenCreated("No", tokenAddresses["No"]);
+        emit TokenCreated("USD", tokenAddresses["USD"]);
     }
-
 
     function transferEncrypted(string memory tokenType, address to, euint32 amount) public onlyAuthContract {
         address tokenAddress = tokenAddresses[tokenType];
@@ -54,24 +55,28 @@ contract EncryptedTokens is Ownable, Permissioned {
 
   
     function mint(string memory tokenType, address to, uint256 amount) public onlyOwner {
-        ERC20(tokenAddresses[tokenType]).mint(to, amount);
+        MintableERC20(tokenAddresses[tokenType]).mint(to, amount);
     }
 
     
-    function checkBalanceEncrypted(string memory tokenType, address account) public view onlyAuthContract returns (euint32) {
+    function checkBalanceEncrypted(string memory tokenType, address account) public view returns (euint32) {
         return _encryptedBalances[account][tokenType];
     }
 
     modifier onlyAuthContract {
-        require(authorizedContracts[tx.origin], "Only authorized contracts can call");
+        require(authorizedContracts[msg.sender], "Only authorized contracts can call");
         _;
     }
 }
 
+interface MintableERC20 {
+    function mint(address to, uint256 amount) external;
+}
+
 // YesToken 
-contract YesToken is ERC20, Ownable {
+contract YesToken is ERC20, Ownable, MintableERC20 {
     constructor() ERC20("YesToken", "YES") Ownable(msg.sender) {
-        _mint(msg.sender, 1000000 * 10 ** decimals());
+        _mint(msg.sender, 1000000);
     }
 
     function mint(address to, uint256 amount) public onlyOwner {
@@ -80,9 +85,19 @@ contract YesToken is ERC20, Ownable {
 }
 
 // NoToken 
-contract NoToken is ERC20, Ownable {
+contract NoToken is ERC20, Ownable, MintableERC20 {
     constructor() ERC20("NoToken", "NO") Ownable(msg.sender) {
-        _mint(msg.sender, 1000000 * 10 ** decimals());
+        _mint(msg.sender, 1000000);
+    }
+
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+}
+// NoToken 
+contract UsdToken is ERC20, Ownable, MintableERC20 {
+    constructor() ERC20("USDToken", "USD") Ownable(msg.sender) {
+        _mint(msg.sender, 1000000);
     }
 
     function mint(address to, uint256 amount) public onlyOwner {
