@@ -34,17 +34,29 @@ contract EncryptedTokens is Ownable, Permissioned {
         emit TokenCreated("No", tokenAddresses["No"]);
     }
 
+ // function placeOrder(string memory buyToken, euint32 amount) public {
+        // We're assuming 'USD' is the only token used for buying other tokens
+        require(keccak256(abi.encodePacked(buyToken)) != keccak256(abi.encodePacked("USD")), "Cannot buy USD with USD");
 
-    function transferEncrypted(string memory tokenType, address to, euint32 amount) public onlyAuthContract {
+        // Deduct USD from the user's balance
+        transferFromEncrypted(msg.sender, address(this), "USD", amount);
+        
+        // Here, you might want to interact with the OrderBook contract
+        // or emit an event to signal an order has been placed
+        emit OrderPlaced(msg.sender, buyToken, "USD", amount);
+    }
+
+
+    function transferFromEncrypted(address from, address to, string memory tokenType, euint32 amount) public onlyAuthContract {
         address tokenAddress = tokenAddresses[tokenType];
         require(tokenAddress != address(0), "Token does not exist");
 
-        FHE.req(FHE.gte(_encryptedBalances[msg.sender][tokenType], amount));
+        FHE.req(FHE.gte(_encryptedBalances[from][tokenType], amount));
 
-        _encryptedBalances[msg.sender][tokenType] = FHE.sub(_encryptedBalances[msg.sender][tokenType], amount);
+        _encryptedBalances[from][tokenType] = FHE.sub(_encryptedBalances[from][tokenType], amount);
         _encryptedBalances[to][tokenType] = FHE.add(_encryptedBalances[to][tokenType], amount);
 
-        emit TokensTransferred(tokenType, msg.sender, to, amount);
+        emit TokensTransferred(tokenType, from, to, amount);
     }
 
     function allowContract(address contractAddress) public onlyOwner {
