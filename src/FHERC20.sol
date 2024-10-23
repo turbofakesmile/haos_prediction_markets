@@ -35,14 +35,13 @@ contract EncryptedTokens is Ownable, Permissioned {
     }
 
  // function placeOrder(string memory buyToken, euint32 amount) public {
-        // We're assuming 'USD' is the only token used for buying other tokens
+        
         require(keccak256(abi.encodePacked(buyToken)) != keccak256(abi.encodePacked("USD")), "Cannot buy USD with USD");
 
-        // Deduct USD from the user's balance
+       
         transferFromEncrypted(msg.sender, address(this), "USD", amount);
-        
-        // Here, you might want to interact with the OrderBook contract
-        // or emit an event to signal an order has been placed
+
+
         emit OrderPlaced(msg.sender, buyToken, "USD", amount);
     }
 
