@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
+import { console } from "forge-std/src/Test.sol";
 
 import { EncryptedTokens } from "./FHERC20.sol";
 import { 
@@ -51,24 +52,30 @@ contract OrderBook {
             msg.sender
         );
         // // if order is buy, transfer B to this contract
-        // encryptedTokens.transferEncrypted(
-        //     tokenBName,
+        // encryptedTokens.transferFromEncrypted(
         //     msg.sender,
+        //     address(this),
+        //     tokenBName,
         //     FHE.mul(
-        //         FHE.asEuint32(
-        //             FHE.not(orders[id].side)),
-        //             orders[id].amount
-        //         )
+        //         FHE.sub(FHE.asEuint32(1),
+        //             FHE.asEuint32(
+        //                 orders[id].side
+        //             )
+        //         ),
+        //         orders[id].amount
+        //     )
         // );
         // // if order is sell, transfer A to this contract
-        // encryptedTokens.transferEncrypted(
-        //     tokenAName,
+        // encryptedTokens.transferFromEncrypted(
         //     msg.sender,
+        //     address(this),
+        //     tokenAName,
         //     FHE.mul(
         //         FHE.asEuint32(
-        //             orders[id].side),
-        //             orders[id].amount
-        //         )
+        //             orders[id].side
+        //         ),
+        //         orders[id].amount
+        //     )
         // );
     }
 
@@ -88,7 +95,7 @@ contract OrderBook {
         ebool takerPriceEqual = FHE.eq(takerOrder.price, makerOrder.price);
         ebool takerPriceHigher = FHE.gt(takerOrder.price, makerOrder.price);
 
-        // encUint price = FHE.min(takerOrder.price, makerOrder.price);
+        encUint price = FHE.min(takerOrder.price, makerOrder.price);
 
         ebool orderCanBeFilled = FHE.or(
             takerPriceEqual, 
@@ -103,7 +110,7 @@ contract OrderBook {
                 FHE.and(sidesDifferent, orderCanBeFilled)
             )
         );
-        // // fill order
+        // fill order
 
         encUint amount = FHE.min(takerOrder.amount, makerOrder.amount);
         takerOrder.amount = FHE.sub(takerOrder.amount, amount);
@@ -112,26 +119,35 @@ contract OrderBook {
         // EncryptedErc20.transfer(side^1, takerTakeAmount, takerOrder.creator);
         // EncryptedErc20.transfer(side, takerMakeAmount, makerOrder.creator);
 
-        // // if taker is buy, taker takes A
-        // encryptedTokens.transferEncrypted(
-        //     tokenAName, 
+        // if taker is buy, taker takes A
+        // encryptedTokens.transferFromEncrypted(
+        //     address(this),
         //     takerOrder.creator, 
+        //     tokenAName, 
         //     FHE.mul(amount, FHE.asEuint32(makerOrder.side))
         // );
         // // if taker is sell, maker takes A
-        // encryptedTokens.transferEncrypted(
+        // encryptedTokens.transferFromEncrypted(
+        //     address(this),
+        //     makerOrder.creator, 
         //     tokenAName, 
-        //     makerOrder.creator, FHE.mul(amount, FHE.asEuint32(takerOrder.side))
+        //     FHE.mul(amount, FHE.asEuint32(takerOrder.side))
         // );
         // // if taker is buy, maker takes B
-        // encryptedTokens.transferEncrypted(tokenBName, makerOrder.creator, 
+        // encryptedTokens.transferFromEncrypted(
+        //     address(this),
+        //     makerOrder.creator, 
+        //     tokenBName, 
         //     FHE.mul(
         //         amount, 
         //         FHE.mul(price, FHE.asEuint32(makerOrder.side))
         //     )
         // );
         // // if taker is sell, taker takes B
-        // encryptedTokens.transferEncrypted(tokenBName, takerOrder.creator, 
+        // encryptedTokens.transferFromEncrypted(
+        //     address(this),
+        //     takerOrder.creator, 
+        //     tokenBName, 
         //     FHE.mul(
         //         amount, 
         //         FHE.mul(price, FHE.asEuint32(takerOrder.side))

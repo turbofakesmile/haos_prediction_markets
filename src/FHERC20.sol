@@ -36,18 +36,6 @@ contract EncryptedTokens is Ownable, Permissioned {
         emit TokenCreated("USD", tokenAddresses["USD"]);
     }
 
- // function placeOrder(string memory buyToken, euint32 amount) public {
-        
-        require(keccak256(abi.encodePacked(buyToken)) != keccak256(abi.encodePacked("USD")), "Cannot buy USD with USD");
-
-       
-        transferFromEncrypted(msg.sender, address(this), "USD", amount);
-
-
-        emit OrderPlaced(msg.sender, buyToken, "USD", amount);
-    }
-
-
     function transferFromEncrypted(address from, address to, string memory tokenType, euint32 amount) public onlyAuthContract {
         address tokenAddress = tokenAddresses[tokenType];
         require(tokenAddress != address(0), "Token does not exist");
