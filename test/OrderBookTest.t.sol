@@ -50,6 +50,9 @@ contract TokenTest is Test, FheEnabled {
 
         token.allowContract(address(orderBook));
 
+        // token.mint("USD", alice, 1000);
+        // token.mint("Yes", bob, 1000);
+
         vm.stopPrank();
     }
 
