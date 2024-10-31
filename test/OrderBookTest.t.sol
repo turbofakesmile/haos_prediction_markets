@@ -8,7 +8,7 @@ import { OrderBook, Order, OrderInput } from "../src/OrderBook.sol";
 import { FheEnabled } from "../util/FheHelper.sol";
 import { Permission, PermissionHelper } from "../util/PermissionHelper.sol";
 
-import { ebool, inEbool, euint32, inEuint32 } from "@fhenixprotocol/contracts/FHE.sol";
+import { ebool, inEbool, euint32, inEuint32, FHE } from "@fhenixprotocol/contracts/FHE.sol";
 
 /// @dev If this is your first time with Forge, read this tutorial in the Foundry Book:
 /// https://book.getfoundry.sh/forge/writing-tests
@@ -229,4 +229,20 @@ contract TokenTest is Test, FheEnabled {
         }
     }
 
+
+
+    function testBuggy() external {
+
+        {
+            vm.startPrank(alice);
+            uint256 id = 1;
+            inEbool memory side = encryptBool(0);
+            inEuint32 memory amount = encrypt32(50);
+            inEuint32 memory price = encrypt32(99);
+
+            euint32 amountEnc = FHE.asEuint32(50);
+            euint32 priceEnc = FHE.asEuint32(99);
+            console.log(FHE.add(amountEnc, priceEnc).decrypt());
+        }
+    }
 }
