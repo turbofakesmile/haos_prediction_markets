@@ -242,7 +242,7 @@ contract TokenTest is Test, FheEnabled {
 
             euint32 amountEnc = FHE.asEuint32(50);
             euint32 priceEnc = FHE.asEuint32(99);
-            console.log(FHE.add(amountEnc, priceEnc).decrypt());
+            assertEq(FHE.add(amountEnc, priceEnc).decrypt(), 0);
         }
     }
 }
