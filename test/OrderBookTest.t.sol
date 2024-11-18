@@ -229,20 +229,4 @@ contract TokenTest is Test, FheEnabled {
         }
     }
 
-
-
-    function testBuggy() external {
-
-        {
-            vm.startPrank(alice);
-            uint256 id = 1;
-            inEbool memory side = encryptBool(0);
-            inEuint32 memory amount = encrypt32(50);
-            inEuint32 memory price = encrypt32(99);
-
-            euint32 amountEnc = FHE.asEuint32(50);
-            euint32 priceEnc = FHE.asEuint32(99);
-            assertEq(FHE.add(amountEnc, priceEnc).decrypt(), 0);
-        }
-    }
 }
