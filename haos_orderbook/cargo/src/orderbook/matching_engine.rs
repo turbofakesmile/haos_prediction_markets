@@ -18,7 +18,7 @@ pub struct MatchingEngine {
 
 impl MatchingEngine {
     pub fn new() -> Self {
-        let market_data: Arc<dyn MarketData> = Arc::new(MarketData::new()); // Assuming MarketData implements Default trait or has a similar initialization
+        let market_data: Arc<dyn MarketData> = Arc::new(MarketData::new());
         let order_management = OrderManagement::new(Arc::clone(&market_data));
 
         let live = AtomicBool::new(true);
@@ -39,7 +39,7 @@ impl MatchingEngine {
                         new_order_c.store(false, Ordering::SeqCst);
                         order_management_c.match_orders();
                     }
-                    // Sleep or yield here to reduce CPU usage, depending on your requirements
+                    
                     thread::sleep(std::time::Duration::from_millis(10));
                 }
             }
