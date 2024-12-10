@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
-import { console } from "forge-std/src/Test.sol";
 
 import { EncryptedTokens } from "./FHERC20.sol";
 import { 
@@ -10,7 +9,7 @@ import {
     ebool,
     inEbool
 } from "@fhenixprotocol/contracts/FHE.sol"; 
-import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import "@fhenixprotocol/contracts/access/Permissioned.sol";
 
 error FHERC20NotAuthorized();
 
@@ -25,15 +24,16 @@ struct OrderInput {
 	inEbool side; // 0 if buy, 1 if sell
 	inEncUint amount; // A if side=0, B if side=1
     inEncUint price;
-
 }
 
-contract OrderBook {
+contract OrderBook is Permissioned {
 
     mapping(uint256 => Order) public orders;
     mapping(uint256 => uint256) public ordersExist;
 
     EncryptedTokens public encryptedTokens;
+
+    uint256 public orderCount;
 
     string constant public tokenAName = "Yes";
     string constant public tokenBName = "USD";
@@ -41,9 +41,15 @@ contract OrderBook {
     constructor(address _encryptedTokens) {
         encryptedTokens = EncryptedTokens(_encryptedTokens);
     }
+
+    function getOrderAmount(Permission calldata permission, uint256 id) public view returns (string memory) {
+        require(ordersExist[id] != 0, "Order does not exist");
+        return FHE.sealoutput(orders[id].amount, permission.publicKey);
+    }
     
-    function placeOrder(OrderInput calldata order, uint256 id) public {
-        if (ordersExist[id] != 0) return;
+    function placeOrder(OrderInput calldata order) public {
+        orderCount++;
+        uint256 id = orderCount;
         ordersExist[id] = 1;
         orders[id] = Order(
             FHE.asEbool(order.side),

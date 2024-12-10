@@ -64,7 +64,7 @@ contract TokenTest is Test, FheEnabled {
         inEuint32 memory amount = encrypt32(50);
         inEuint32 memory price = encrypt32(100);
 
-        orderBook.placeOrder(OrderInput(side, amount, price), id);
+        orderBook.placeOrder(OrderInput(side, amount, price));
 
         (
             ebool orderSide, 
@@ -78,7 +78,7 @@ contract TokenTest is Test, FheEnabled {
         assertEq(orderCreator, alice);
     }
 
-    function test_MatchOrers() external {
+    function test_MatchOrersEqualPrice() external {
 
         {
             vm.startPrank(alice);
@@ -87,7 +87,7 @@ contract TokenTest is Test, FheEnabled {
             inEuint32 memory amount = encrypt32(50);
             inEuint32 memory price = encrypt32(100);
 
-            orderBook.placeOrder(OrderInput(side, amount, price), id);
+            orderBook.placeOrder(OrderInput(side, amount, price));
 
             (
                 ebool orderSide, 
@@ -109,7 +109,7 @@ contract TokenTest is Test, FheEnabled {
             inEuint32 memory amount = encrypt32(100);
             inEuint32 memory price = encrypt32(100);
 
-            orderBook.placeOrder(OrderInput(side, amount, price), id);
+            orderBook.placeOrder(OrderInput(side, amount, price));
 
             (
                 ebool orderSide, 
@@ -154,7 +154,82 @@ contract TokenTest is Test, FheEnabled {
     }
 
 
-    function testFail_MatchOrers2() external {
+    function test_MatchOrersDiffPrice() external {
+
+        {
+            vm.startPrank(alice);
+            uint256 id = 1;
+            inEbool memory side = encryptBool(0);
+            inEuint32 memory amount = encrypt32(50);
+            inEuint32 memory price = encrypt32(101);
+
+            orderBook.placeOrder(OrderInput(side, amount, price));
+
+            (
+                ebool orderSide, 
+                euint32 orderAmount,
+                euint32 orderPrice,
+                address orderCreator
+            ) = orderBook.orders(id);
+            assertEq(orderSide.decrypt(), false);
+            assertEq(orderAmount.decrypt(), 50);
+            assertEq(orderPrice.decrypt(), 101);
+            assertEq(orderCreator, alice);
+            vm.stopPrank();
+        }
+
+        {
+            vm.startPrank(bob);
+            uint256 id = 2;
+            inEbool memory side = encryptBool(1);
+            inEuint32 memory amount = encrypt32(100);
+            inEuint32 memory price = encrypt32(100);
+
+            orderBook.placeOrder(OrderInput(side, amount, price));
+
+            (
+                ebool orderSide, 
+                euint32 orderAmount,
+                euint32 orderPrice,
+                address orderCreator
+            ) = orderBook.orders(id);
+            assertEq(orderSide.decrypt(), true);
+            assertEq(orderAmount.decrypt(), 100);
+            assertEq(orderPrice.decrypt(), 100);
+            assertEq(orderCreator, bob);
+            vm.stopPrank();
+        }
+
+        orderBook.matchOrders(1, 2);
+
+        {
+            (
+                ebool orderSide, 
+                euint32 orderAmount,
+                euint32 orderPrice,
+                address orderCreator
+            ) = orderBook.orders(1);
+            assertEq(orderSide.decrypt(), false);
+            assertEq(orderAmount.decrypt(), 0);
+            assertEq(orderPrice.decrypt(), 101);
+            assertEq(orderCreator, alice);
+        }
+
+        {
+            (
+                ebool orderSide, 
+                euint32 orderAmount,
+                euint32 orderPrice,
+                address orderCreator
+            ) = orderBook.orders(2);
+            assertEq(orderSide.decrypt(), true);
+            assertEq(orderAmount.decrypt(), 50);
+            assertEq(orderPrice.decrypt(), 100);
+            assertEq(orderCreator, bob);
+        }
+    }
+
+    function testFail_NonMatchingOrders() external {
 
         {
             vm.startPrank(alice);
@@ -163,7 +238,7 @@ contract TokenTest is Test, FheEnabled {
             inEuint32 memory amount = encrypt32(50);
             inEuint32 memory price = encrypt32(99);
 
-            orderBook.placeOrder(OrderInput(side, amount, price), id);
+            orderBook.placeOrder(OrderInput(side, amount, price));
 
             (
                 ebool orderSide, 
@@ -185,7 +260,7 @@ contract TokenTest is Test, FheEnabled {
             inEuint32 memory amount = encrypt32(100);
             inEuint32 memory price = encrypt32(100);
 
-            orderBook.placeOrder(OrderInput(side, amount, price), id);
+            orderBook.placeOrder(OrderInput(side, amount, price));
 
             (
                 ebool orderSide, 
