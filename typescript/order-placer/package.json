@@ -1,0 +1,19 @@
+{
+  "name": "order-placer",
+  "module": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run ./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "ethers": "^6.13.4",
+    "fhenixjs": "^0.4.1",
+    "viem": "^2.21.56"
+  }
+}

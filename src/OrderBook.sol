@@ -26,6 +26,8 @@ struct OrderInput {
     inEncUint price;
 }
 
+event OrderPlaced(uint256 indexed id);
+
 contract OrderBook is Permissioned {
 
     mapping(uint256 => Order) public orders;
@@ -57,6 +59,7 @@ contract OrderBook is Permissioned {
             FHE.asEuint32(order.price),
             msg.sender
         );
+        emit OrderPlaced(id);
         // // if order is buy, transfer B to this contract
         // encryptedTokens.transferFromEncrypted(
         //     msg.sender,
