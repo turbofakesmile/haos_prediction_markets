@@ -1,8 +1,7 @@
 pub mod order;
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::{cmp::Ordering, collections::BinaryHeap};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct OrderBook {
     buy_orders: BinaryHeap<order::Order>,
     sell_orders: BinaryHeap<order::Order>,
@@ -16,7 +15,7 @@ impl OrderBook {
         }
     }
 
-    pub fn add_order(&mut self, mut order: order::Order) -> bool {
+    pub fn add_order(&mut self, order: order::Order) -> bool {
         match order.side {
             order::OrderSide::Buy => {
                 self.buy_orders.push(order);
@@ -75,3 +74,26 @@ impl PartialEq for order::Order {
 
 // Eq is required by BinaryHeap when using PartialOrd
 impl Eq for order::Order {}
+
+#[cfg(test)]
+mod tests {
+    use crate::orderbook::{
+        order::{Order, OrderSide},
+        OrderBook,
+    };
+
+    #[test]
+    fn test_add_match() {
+        let mut book = OrderBook::new();
+
+        let buy_order = Order::new(1, 1, 100, 11, OrderSide::Buy);
+        let sell_order = Order::new(2, 1, 100, 10, OrderSide::Sell);
+
+        book.add_order(buy_order);
+        book.add_order(sell_order);
+
+        let matches = book.match_orders();
+
+        assert_eq!(matches.len(), 2);
+    }
+}

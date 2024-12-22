@@ -1,16 +1,22 @@
-mod orderbook;
-use orderbook::order::{Order, OrderSide};
-use orderbook::OrderBook;
+use std::{env, io};
 
-fn main() {
-    let mut book = OrderBook::new();
+use anyhow::Result;
+use haos_orderbook::{config::resolve_config, server::start_order_server};
+use tracing_subscriber::EnvFilter;
 
-    let buy_order = Order::new(1, 1, 100, 11, OrderSide::Buy);
-    let sell_order = Order::new(2, 1, 100, 10, OrderSide::Sell);
+#[tokio::main]
+async fn main() -> Result<()> {
+    init_tracing();
+    let server_config = resolve_config();
+    start_order_server(&server_config).await?;
+    Ok(())
+}
 
-    book.add_order(buy_order);
-    book.add_order(sell_order);
-
-    let matches = book.match_orders();
-    println!("Matched orders: {:?}", matches);
+fn init_tracing() {
+    let filter = EnvFilter::new(env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()));
+    tracing_subscriber::fmt()
+        .with_writer(io::stdout)
+        .with_target(true)
+        .with_env_filter(filter)
+        .init();
 }

@@ -11,4 +11,14 @@ categories.workspace = true
 repository.workspace = true
 
 [dependencies]
-
+anyhow = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
+tower-http = { workspace = true, features = ["add-extension"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = [
+    "fmt",
+    "json",
+    "env-filter",
+] }

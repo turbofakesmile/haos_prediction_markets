@@ -3,7 +3,6 @@ resolver = "2"
 
 members = ["crates/*"]
 
-
 [workspace.package]
 edition = "2021"
 authors = ["Haos"]
@@ -11,3 +10,13 @@ homepage = ""
 license = "MIT"
 categories = [""]
 repository = "https://github.com/turbofakesmile/haos_prediction_markets"
+
+[workspace.dependencies]
+anyhow = "1.0.95"
+axum = "0.7.9"
+serde = "1.0.216"
+serde_json = "1.0.134"
+tokio = "1.42.0"
+tower-http = "0.6.2"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
