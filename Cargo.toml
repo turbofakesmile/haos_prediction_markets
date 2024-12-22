@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+
+members = ["crates/*"]
+
+
+[workspace.package]
+edition = "2021"
+authors = ["Haos"]
+homepage = ""
+license = "MIT"
+categories = [""]
+repository = "https://github.com/turbofakesmile/haos_prediction_markets"
