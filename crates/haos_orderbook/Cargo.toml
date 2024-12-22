@@ -1,0 +1,14 @@
+[package]
+name = "haos_orderbook"
+version = "0.1.0"
+description = "Orderbook for Haos Prediction Markets"
+
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+categories.workspace = true
+repository.workspace = true
+
+[dependencies]
+
