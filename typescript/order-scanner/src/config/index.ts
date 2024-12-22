@@ -2,13 +2,19 @@ import { getEthersConfig, getFhenixClient, getViemClient } from "./fhenixChain";
 import { abi as orderBookAbi } from "../_abi/orderbook";
 import { getContract } from "viem";
 
-if (!process.env.PRIVATE_KEY || !process.env.CONTRACT_ADDRESS || !process.env.START_BLOCK) {
+if (
+  !process.env.PRIVATE_KEY ||
+  !process.env.CONTRACT_ADDRESS ||
+  !process.env.START_BLOCK ||
+  !process.env.ORDER_BOOK_URL
+) {
   throw new Error("Missing required environment variables");
 }
 
 const privateKey = process.env.PRIVATE_KEY as `0x${string}`;
 const contractAddress = process.env.CONTRACT_ADDRESS as `0x${string}`;
 export const startBlock = BigInt(process.env.START_BLOCK as string);
+export const orderBookUrl = process.env.ORDER_BOOK_URL;
 
 export const globalConfig = {
   privateKey,

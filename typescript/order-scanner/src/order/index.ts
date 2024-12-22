@@ -6,11 +6,15 @@ import {
   orderBookContract,
   viemWalletClient,
 } from "../config";
+const permit = await fhenixClient.generatePermit(globalConfig.contractAddress, ethersProvider, ethersWallet);
+const permission = fhenixClient.extractPermitPermission(permit);
 
-export async function getOrderById(orderId: bigint) {
-  const permit = await fhenixClient.generatePermit(globalConfig.contractAddress, ethersProvider, ethersWallet);
+export type Order = {
+  id: number;
+  amount: number;
+};
 
-  const permission = fhenixClient.extractPermitPermission(permit);
+export async function getOrderById(orderId: bigint): Promise<Order> {
   const sealedResult = await orderBookContract.read.getOrderAmount([
     {
       publicKey: permission.publicKey as `0x${string}`,
@@ -18,11 +22,9 @@ export async function getOrderById(orderId: bigint) {
     },
     orderId,
   ]);
-  console.log(fhenixClient.hasPermit(globalConfig.contractAddress, viemWalletClient.account.address));
-  const result = await fhenixClient.unseal(
-    globalConfig.contractAddress,
-    sealedResult,
-    viemWalletClient.account.address,
-  );
-  console.log(result);
+  const result = fhenixClient.unseal(globalConfig.contractAddress, sealedResult, viemWalletClient.account.address);
+  return {
+    id: Number(orderId),
+    amount: Number(result),
+  };
 }

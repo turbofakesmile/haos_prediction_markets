@@ -1,4 +1,7 @@
+import { id } from "ethers";
 import { orderBookContract, startBlock, viemWalletClient } from "./config";
+import { getOrderById } from "./order";
+import { postOrder } from "./orderbook";
 
 const POLLING_INTERVAL = 4000;
 
@@ -39,6 +42,12 @@ while (true) {
       toBlock: toBlock,
     },
   );
-  console.log(logs);
+  if (logs.length > 0) {
+    const orders = await Promise.all(logs.map(async (log) => getOrderById(log.args.id!)));
+    console.log(orders);
+    for (const order of orders) {
+      await postOrder(order);
+    }
+  }
   currentBlock = toBlock + 1n;
 }

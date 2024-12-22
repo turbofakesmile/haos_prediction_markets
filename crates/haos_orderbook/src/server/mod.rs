@@ -42,9 +42,8 @@ pub async fn start_order_server(config: &ServerConfig) -> Result<()> {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NewOrderQuery {
-    pub side: String,
-    pub price: u32,
-    pub quantity: u32,
+    pub id: u32,
+    pub amount: u32,
 }
 
 async fn new_order_handler(
@@ -55,15 +54,11 @@ async fn new_order_handler(
 
     let mut app_state = state.write().unwrap();
     app_state.orderbook.add_order(Order {
-        id: 0,
+        id: query.id,
         contract_id: 0,
-        volume: query.quantity,
-        price: query.price,
-        side: match query.side.as_str() {
-            "buy" => OrderSide::Buy,
-            "sell" => OrderSide::Sell,
-            _ => panic!("Invalid side"),
-        },
+        volume: query.amount,
+        price: 100,
+        side: OrderSide::Buy,
     });
 
     info!("OrderBook: {:?}", app_state.orderbook);
