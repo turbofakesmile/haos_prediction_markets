@@ -43,7 +43,9 @@ pub async fn start_order_server(config: &ServerConfig) -> Result<()> {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NewOrderQuery {
     pub id: u32,
+    pub side: bool,
     pub amount: u32,
+    pub price: u32,
 }
 
 async fn new_order_handler(
@@ -57,8 +59,12 @@ async fn new_order_handler(
         id: query.id,
         contract_id: 0,
         volume: query.amount,
-        price: 100,
-        side: OrderSide::Buy,
+        price: query.price,
+        side: if query.side {
+            OrderSide::Sell
+        } else {
+            OrderSide::Buy
+        },
     });
 
     info!("OrderBook: {:?}", app_state.orderbook);

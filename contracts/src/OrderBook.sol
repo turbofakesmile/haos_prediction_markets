@@ -44,9 +44,17 @@ contract OrderBook is Permissioned {
         encryptedTokens = EncryptedTokens(_encryptedTokens);
     }
 
-    function getOrderAmount(Permission calldata permission, uint256 id) public view returns (string memory) {
+    function getOrder(Permission calldata permission, uint256 id) public view returns (
+        string memory,
+        string memory,
+        string memory
+    ) {
         require(ordersExist[id] != 0, "Order does not exist");
-        return FHE.sealoutput(orders[id].amount, permission.publicKey);
+        return (
+            FHE.sealoutput(orders[id].side, permission.publicKey),
+            FHE.sealoutput(orders[id].amount, permission.publicKey),
+            FHE.sealoutput(orders[id].price, permission.publicKey)
+        );
     }
     
     function placeOrder(OrderInput calldata order) public {
