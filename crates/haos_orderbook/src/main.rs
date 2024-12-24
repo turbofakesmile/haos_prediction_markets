@@ -1,3 +1,4 @@
+// main.rs
 use std::{env, io};
 
 use anyhow::Result;

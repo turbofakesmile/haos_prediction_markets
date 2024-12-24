@@ -1,73 +1,49 @@
-use std::sync::{Arc, RwLock};
+pub mod reboot;
 
-use anyhow::Result;
-use axum::{
-    routing::{get, post},
-    Extension, Json, Router,
-};
-use serde::{Deserialize, Serialize};
-use tower_http::add_extension::AddExtensionLayer;
-use tracing::info;
+use tokio::{io::AsyncWriteExt, net::TcpListener};
 
-use crate::{
-    config::ServerConfig,
-    orderbook::{
-        order::{Order, OrderSide},
-        OrderBook,
-    },
-};
+use crate::orderbook::OrderBook;
 
-#[derive(Debug, Clone)]
-pub struct AppState {
-    pub orderbook: OrderBook,
+#[derive(Clone, Debug)]
+pub struct RebootService {
+    order_book: OrderBook,
 }
 
-pub async fn start_order_server(config: &ServerConfig) -> Result<()> {
-    info!("Listening on {}", config.address());
+impl RebootService {
+    pub fn new() -> Self {
+        RebootService {
+            order_book: OrderBook::new(),
+        }
+    }
 
-    let app_state = Arc::new(RwLock::new(AppState {
-        orderbook: OrderBook::new(),
-    }));
-
-    let app = Router::new()
-        .route("/hello", get(|| async { "Hello, World!" }))
-        .route("/new_order", post(new_order_handler))
-        .layer(AddExtensionLayer::new(app_state));
-
-    // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind(config.address()).await?;
-    axum::serve(listener, app).await?;
-    Ok(())
+    pub fn process_events(&mut self, event: OrdersMatchedEvent) {
+        for match_data in event.matches {
+            self.order_book
+                .modify_order_volume(match_data.order_id, match_data.matched_volume);
+        }
+    }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct NewOrderQuery {
-    pub id: u32,
-    pub side: bool,
-    pub amount: u32,
-    pub price: u32,
+#[derive(Clone, Debug)]
+pub struct OrdersMatchedEvent {
+    pub matches: Vec<OrderMatch>,
 }
 
-async fn new_order_handler(
-    state: Extension<Arc<RwLock<AppState>>>,
-    Json(query): Json<NewOrderQuery>,
-) -> String {
-    info!("Received new order: {:?}", query);
+#[derive(Clone, Debug)]
+pub struct OrderMatch {
+    pub order_id: u32,
+    pub matched_volume: u32,
+}
 
-    let mut app_state = state.write().unwrap();
-    app_state.orderbook.add_order(Order {
-        id: query.id,
-        contract_id: 0,
-        volume: query.amount,
-        price: query.price,
-        side: if query.side {
-            OrderSide::Sell
-        } else {
-            OrderSide::Buy
-        },
-    });
+// Function to start the server
+pub async fn start_order_server(config: &crate::config::ServerConfig) -> anyhow::Result<()> {
+    let listener = TcpListener::bind(config.address()).await?;
+    println!("Server running on {}", config.address());
 
-    info!("OrderBook: {:?}", app_state.orderbook);
-
-    "Order received".to_string()
+    loop {
+        let (mut socket, _) = listener.accept().await?;
+        tokio::spawn(async move {
+            let _ = socket.write_all(b"Welcome to the Order Server!\n").await;
+        });
+    }
 }
