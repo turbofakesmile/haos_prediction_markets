@@ -1,14 +1,36 @@
 use std::{env, io};
 
+use alloy::providers::{ProviderBuilder, WsConnect};
 use anyhow::Result;
-use haos_orderbook::{config::resolve_config, server::start_order_server};
+use haos_orderbook::{
+    chain::{listener::OrderListenerBuilder, order::MockedOrderMetadataReader},
+    config::resolve_config,
+    LoggingOrderHandler,
+};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let config = resolve_config();
     init_tracing();
-    let server_config = resolve_config();
-    start_order_server(&server_config).await?;
+    // let orderbook = OrderBook::new();
+
+    let ws_provider = ProviderBuilder::new()
+        .on_ws(WsConnect::new(config.chain.rpc_url_ws))
+        .await?;
+
+    let http_provider = ProviderBuilder::new().on_http(config.chain.rpc_url.parse()?);
+
+    let mocked_order_metadata_reader =
+        MockedOrderMetadataReader::new(&http_provider, config.chain.orderbook_address);
+
+    let mut listener = OrderListenerBuilder::new(&ws_provider)
+        .with_address(config.chain.orderbook_address)
+        .with_handler(LoggingOrderHandler::new(mocked_order_metadata_reader))
+        .build()?;
+
+    listener.listen().await?;
+
     Ok(())
 }
 

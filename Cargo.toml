@@ -12,8 +12,10 @@ categories = [""]
 repository = "https://github.com/turbofakesmile/haos_prediction_markets"
 
 [workspace.dependencies]
+alloy = { version = "0.8.3", features = ["full"] }
 anyhow = "1.0.95"
 axum = "0.7.9"
+futures-util = "0.3"
 serde = "1.0.216"
 serde_json = "1.0.134"
 tokio = "1.42.0"

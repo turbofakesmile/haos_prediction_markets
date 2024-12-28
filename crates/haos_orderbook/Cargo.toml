@@ -11,8 +11,10 @@ categories.workspace = true
 repository.workspace = true
 
 [dependencies]
+alloy = { workspace = true }
 anyhow = { workspace = true }
 axum = { workspace = true }
+futures-util = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
 tower-http = { workspace = true, features = ["add-extension"] }
