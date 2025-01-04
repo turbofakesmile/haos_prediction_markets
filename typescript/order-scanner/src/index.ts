@@ -1,53 +1,41 @@
-import { id } from "ethers";
-import { orderBookContract, startBlock, viemWalletClient } from "./config";
 import { getOrderById } from "./order";
-import { postOrder } from "./orderbook";
 
-const POLLING_INTERVAL = 4000;
+const server = Bun.serve({
+  port: 3000,
+  async fetch(req) {
+    const url = new URL(req.url);
 
-orderBookContract.watchEvent.OrderPlaced(
-  {},
-  {
-    onLogs: async (logs) => {
-      console.log(logs);
-    },
-    // onError: (error) => {
-    //   console.error(error);
-    // },
-    fromBlock: 10600n,
-    // pollingInterval: POLLING_INTERVAL,
-  },
-);
+    // Handle GET /order/:id endpoint
+    if (req.method === "GET" && url.pathname.startsWith("/order/")) {
+      try {
+        const orderId = url.pathname.split("/")[2]; // Get the ID from the URL
+        if (!orderId) {
+          return new Response(JSON.stringify({ error: "Order ID is required" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
 
-const blockInterval = 100n;
-
-let currentBlock = startBlock;
-
-while (true) {
-  await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL));
-
-  const blockNumber = await viemWalletClient.getBlockNumber();
-  let toBlock = currentBlock + blockInterval;
-  if (toBlock > blockNumber) {
-    toBlock = blockNumber;
-  }
-  if (currentBlock > blockNumber) {
-    continue;
-  }
-
-  const logs = await orderBookContract.getEvents.OrderPlaced(
-    {},
-    {
-      fromBlock: currentBlock,
-      toBlock: toBlock,
-    },
-  );
-  if (logs.length > 0) {
-    const orders = await Promise.all(logs.map(async (log) => getOrderById(log.args.id!)));
-    console.log(orders);
-    for (const order of orders) {
-      await postOrder(order);
+        const order = await getOrderById(BigInt(orderId));
+        return new Response(JSON.stringify(order), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error("Error fetching order:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch order" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
     }
-  }
-  currentBlock = toBlock + 1n;
-}
+
+    // Handle 404 for unknown routes
+    return new Response(JSON.stringify({ error: "Not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  },
+});
+
+console.log(`Server running at http://localhost:${server.port}`);

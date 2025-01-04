@@ -19,19 +19,19 @@ export async function placeOrder(orderInput: OrderInputs) {
   // 0 if buy, 1 if sell
   const rawSide = orderInput.type === "buy" ? false : true;
 
-  // const order = await contract.write.placeOrder([
-  //   {
-  //     side: encryptedToHex(await fhenixClient.encrypt_bool(rawSide)),
-  //     amount: encryptedToHex(await fhenixClient.encrypt_uint32(Number(orderInput.amount))),
-  //     price: encryptedToHex(await fhenixClient.encrypt_uint32(Number(orderInput.price))),
-  //   },
-  // ]);
   const order = await contract.write.placeOrder([
     {
-      side: rawSide,
-      amount: Number(orderInput.amount),
-      price: Number(orderInput.price),
+      side: encryptedToHex(await fhenixClient.encrypt_bool(rawSide)),
+      amount: encryptedToHex(await fhenixClient.encrypt_uint32(Number(orderInput.amount))),
+      price: encryptedToHex(await fhenixClient.encrypt_uint32(Number(orderInput.price))),
     },
   ]);
+  // const order = await contract.write.placeOrder([
+  //   {
+  //     side: rawSide,
+  //     amount: Number(orderInput.amount),
+  //     price: Number(orderInput.price),
+  //   },
+  // ]);
   await viemWalletClient.waitForTransactionReceipt({ hash: order }).then(console.log);
 }

@@ -15,6 +15,7 @@ alloy = { workspace = true }
 anyhow = { workspace = true }
 axum = { workspace = true }
 futures-util = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
 tower-http = { workspace = true, features = ["add-extension"] }

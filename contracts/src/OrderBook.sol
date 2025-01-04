@@ -27,6 +27,8 @@ struct OrderInput {
 }
 
 event OrderPlaced(uint256 indexed id);
+event OrderFilled(uint256 indexed id);
+event OrdersMatched(uint256 indexed takerId, uint256 indexed makerId);
 
 contract OrderBook is Permissioned {
 
@@ -173,6 +175,10 @@ contract OrderBook is Permissioned {
 
         orders[takerOrderId] = takerOrder;
         orders[makerOrderId] = makerOrder;
+
+        emit OrderFilled(takerOrderId);
+        emit OrderFilled(makerOrderId);
+        emit OrdersMatched(takerOrderId, makerOrderId);
 
     }
 

@@ -4,6 +4,7 @@ use alloy::{
     transports::http::{Client, Http},
 };
 use anyhow::Result;
+use serde::Deserialize;
 
 use super::contract::IOrderBook;
 use crate::{
@@ -21,54 +22,89 @@ pub trait OrderMetadataReader {
     ) -> impl std::future::Future<Output = Result<Order>> + Send;
 }
 
-pub struct MockedOrderMetadataReader<'a, P: Provider<Http<Client>>> {
-    provider: &'a P,
-    contract_address: Address,
-}
+// pub struct MockedOrderMetadataReader<'a, P: Provider<Http<Client>>> {
+//     provider: &'a P,
+//     contract_address: Address,
+// }
 
-impl<'a, P: Provider<Http<Client>>> MockedOrderMetadataReader<'a, P> {
-    pub fn new(provider: &'a P, contract_address: Address) -> Self {
-        Self {
-            provider,
-            contract_address,
-        }
-    }
-}
+// impl<'a, P: Provider<Http<Client>>> MockedOrderMetadataReader<'a, P> {
+//     pub fn new(provider: &'a P, contract_address: Address) -> Self {
+//         Self {
+//             provider,
+//             contract_address,
+//         }
+//     }
+// }
 
-impl<'a, P: Provider<Http<Client>>> OrderMetadataReader for MockedOrderMetadataReader<'a, P> {
-    async fn get_metadata(&self, order_id: U256) -> Result<Order> {
-        // pro
-        let contract = IOrderBook::new(self.contract_address, self.provider);
-        let order = contract.getOrder(order_id).call().await?;
-        Ok(Order::new(
-            order_id.try_into().unwrap(),
-            0,
-            order._1,
-            order._2,
-            if order._0 {
-                OrderSide::Sell
-            } else {
-                OrderSide::Buy
-            },
-        ))
-    }
+// impl<'a, P: Provider<Http<Client>>> OrderMetadataReader for MockedOrderMetadataReader<'a, P> {
+//     async fn get_metadata(&self, order_id: U256) -> Result<Order> {
+//         // pro
+//         let contract = IOrderBook::new(self.contract_address, self.provider);
+//         let order = contract.getOrder(order_id).call().await?;
+//         Ok(Order::new(
+//             order_id.try_into().unwrap(),
+//             0,
+//             order._1,
+//             order._2,
+//             if order._0 {
+//                 OrderSide::Sell
+//             } else {
+//                 OrderSide::Buy
+//             },
+//         ))
+//     }
+// }
+
+#[derive(Deserialize)]
+struct OrderResponse {
+    side: bool,
+    amount: u64,
+    price: u64,
 }
 
 pub struct FHEOrderMetadataReader {
-    contract_address: Address,
+    api_url: String,
 }
 
 impl FHEOrderMetadataReader {
-    pub fn new(contract_address: Address) -> Self {
-        Self { contract_address }
+    pub fn new() -> Self {
+        Self {
+            api_url: "http://localhost:3000".to_string(),
+        }
     }
 }
 
 impl OrderMetadataReader for FHEOrderMetadataReader {
     async fn get_metadata(&self, order_id: U256) -> Result<Order> {
-        // TODO: call node.js server to get order metadata
-        // return not implemented error
-        Err(anyhow::anyhow!("Not implemented"))
+        let url = format!("{}/order/{}", self.api_url, order_id);
+
+        let response = reqwest::get(&url)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to fetch order: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(anyhow::anyhow!(
+                "Failed to fetch order. Status: {}",
+                response.status()
+            ));
+        }
+
+        let order_data: OrderResponse = response
+            .json()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to parse order response: {}", e))?;
+
+        Ok(Order::new(
+            order_id.try_into().unwrap(),
+            0,
+            order_data.amount.try_into().unwrap(),
+            order_data.price.try_into().unwrap(),
+            if order_data.side {
+                OrderSide::Sell
+            } else {
+                OrderSide::Buy
+            },
+        ))
     }
 }
 

@@ -7,7 +7,7 @@ use alloy::{
 };
 use anyhow::Result;
 use haos_orderbook::{
-    chain::{listener::OrderListener, order::MockedOrderMetadataReader},
+    chain::{listener::OrderListener, order::FHEOrderMetadataReader},
     config::resolve_config,
     manager::OrderManager,
 };
@@ -23,10 +23,9 @@ async fn main() -> Result<()> {
         .on_ws(WsConnect::new(config.chain.rpc_url_ws))
         .await?;
 
-    let http_provider = ProviderBuilder::new().on_http(config.chain.rpc_url.parse()?);
+    // let http_provider = ProviderBuilder::new().on_http(config.chain.rpc_url.parse()?);
 
-    let mocked_order_metadata_reader =
-        MockedOrderMetadataReader::new(&http_provider, config.chain.orderbook_address);
+    let mocked_order_metadata_reader: FHEOrderMetadataReader = FHEOrderMetadataReader::new();
 
     let wallet = EthereumWallet::from(
         PrivateKeySigner::from_str(
