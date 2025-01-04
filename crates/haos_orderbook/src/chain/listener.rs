@@ -1,16 +1,16 @@
 use alloy::{
-    primitives::{Address, U256},
+    primitives::Address,
     providers::Provider,
     pubsub::PubSubFrontend,
     rpc::types::{Filter, Log},
     sol_types::SolEvent,
 };
 use anyhow::Result;
-use futures_util::StreamExt;
+use futures_util::{future::join_all, StreamExt};
 use tracing::info;
 
-use super::contract::IOrderBook;
-use crate::OrderHandler;
+use super::{contract::IOrderBook, ContractEvent};
+use crate::{orderbook::MatchedOrders, OrderHandler};
 
 pub struct OrderListenerBuilder<'a, P: Provider<PubSubFrontend>, H: OrderHandler> {
     provider: &'a P,
@@ -25,7 +25,7 @@ impl<'a, P: Provider<PubSubFrontend>, H: OrderHandler> OrderListenerBuilder<'a, 
             provider,
             address: None,
             handlers: Vec::new(),
-            start_block: 14799,
+            start_block: 19636,
         }
     }
 
@@ -71,7 +71,7 @@ impl<'a, P: Provider<PubSubFrontend>, H: OrderHandler> OrderListener<'a, P, H> {
     }
 
     pub async fn listen(&mut self) -> Result<()> {
-        let latest_block = self.provider.get_block_number().await?;
+        let mut latest_block = self.provider.get_block_number().await?;
         info!("Latest block: {}", latest_block);
 
         let orders = self
@@ -79,54 +79,44 @@ impl<'a, P: Provider<PubSubFrontend>, H: OrderHandler> OrderListener<'a, P, H> {
             .await?;
         self.handle_orders(&orders).await?;
 
-        let sub = self
-            .provider
-            .subscribe_logs(&Filter::new().address(self.address))
-            .await?;
+        let sub = self.provider.subscribe_blocks().await?;
         let mut stream = sub.into_stream();
 
-        let mut first_read = true;
-
-        while let Some(log) = stream.next().await {
-            if first_read {
-                match log.block_number {
-                    Some(block_number) => {
-                        if block_number > latest_block + 1 {
-                            info!(
-                                "Handling missed blocks: {} - {}",
-                                latest_block + 1,
-                                block_number
-                            );
-                            let missed_orders = self
-                                .fetch_orders_in_range(latest_block + 1, block_number)
-                                .await?;
-                            self.handle_orders(&missed_orders).await?;
-                        }
-                    }
-                    _ => {}
-                }
-                first_read = false;
+        while let Some(block_header) = stream.next().await {
+            // get logs from block
+            let block_number = block_header.number;
+            if latest_block + 1 > block_number {
+                continue;
             }
-            let order = self.extract_order_from_log(log)?;
-            if let Some((id, block_number)) = order {
-                self.handle_orders(&vec![(id, block_number)]).await?;
-            }
+            let orders = self
+                .fetch_orders_in_range(latest_block + 1, block_number)
+                .await?;
+            latest_block = block_number;
+            self.handle_orders(&orders).await?;
         }
 
         Ok(())
     }
 
-    fn extract_order_from_log(&self, log: Log) -> Result<Option<(U256, u64)>> {
+    fn extract_order_from_log(&self, log: Log) -> Result<Option<ContractEvent>> {
         let block_number = log.block_number.unwrap_or(0);
 
         match log.topic0() {
             Some(&IOrderBook::OrderPlaced::SIGNATURE_HASH) => {
                 let IOrderBook::OrderPlaced { id } = log.log_decode()?.inner.data;
-                Ok(Some((id, block_number)))
+                Ok(Some(ContractEvent::OrderUpdated(id, block_number)))
             }
             Some(&IOrderBook::OrderFilled::SIGNATURE_HASH) => {
                 let IOrderBook::OrderFilled { id } = log.log_decode()?.inner.data;
-                Ok(Some((id, block_number)))
+                Ok(Some(ContractEvent::OrderUpdated(id, block_number)))
+            }
+            Some(&IOrderBook::OrdersMatched::SIGNATURE_HASH) => {
+                let IOrderBook::OrdersMatched { takerId, makerId } = log.log_decode()?.inner.data;
+                Ok(Some(ContractEvent::OrdersMatched(
+                    takerId,
+                    makerId,
+                    block_number,
+                )))
             }
             _ => Ok(None),
         }
@@ -136,7 +126,7 @@ impl<'a, P: Provider<PubSubFrontend>, H: OrderHandler> OrderListener<'a, P, H> {
         &self,
         from_block: u64,
         to_block: u64,
-    ) -> Result<Vec<(U256, u64)>> {
+    ) -> Result<Vec<ContractEvent>> {
         let filter = Filter::new()
             .address(self.address)
             .from_block(from_block)
@@ -154,7 +144,36 @@ impl<'a, P: Provider<PubSubFrontend>, H: OrderHandler> OrderListener<'a, P, H> {
         Ok(orders)
     }
 
-    async fn handle_orders(&mut self, orders: &Vec<(U256, u64)>) -> Result<()> {
+    async fn handle_orders(&mut self, orders: &Vec<ContractEvent>) -> Result<()> {
+        info!("Handling orders: {:?}", orders);
+        for order in orders.iter() {
+            match order {
+                ContractEvent::OrdersMatched(taker_id, maker_id, _) => {
+                    let matched_orders = MatchedOrders {
+                        taker_order_id: taker_id.clone().try_into().unwrap(),
+                        maker_order_id: maker_id.clone().try_into().unwrap(),
+                    };
+                    join_all(
+                        self.handlers
+                            .iter_mut()
+                            .map(|handler| handler.match_orders(matched_orders.clone())),
+                    )
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?;
+                }
+                _ => {}
+            }
+        }
+
+        let orders = orders
+            .iter()
+            .filter_map(|order| match order {
+                ContractEvent::OrderUpdated(id, block_number) => Some((*id, *block_number)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
         for handler in self.handlers.iter_mut() {
             handler.handle_orders(orders.clone()).await?;
         }

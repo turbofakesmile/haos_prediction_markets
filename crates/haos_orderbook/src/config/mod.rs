@@ -19,7 +19,7 @@ pub fn resolve_config() -> Config {
         chain: ChainConfig {
             rpc_url: "https://api.nitrogen.fhenix.zone".to_string(),
             rpc_url_ws: "wss://api.nitrogen.fhenix.zone:8548".to_string(),
-            orderbook_address: Address::from_str("0xE7DcCB9Ea2ff5FD40e9EB493Fc9dE29770d1B49A")
+            orderbook_address: Address::from_str("0x19423a7c620FBa5057A10F2EA7359A350A615026")
                 .unwrap(),
         },
     }

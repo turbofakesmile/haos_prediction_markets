@@ -1,10 +1,18 @@
 pub mod order;
 use std::{cmp::Ordering, collections::BinaryHeap};
 
+use tracing::info;
+
 #[derive(Clone, Debug)]
 pub struct OrderBook {
     buy_orders: BinaryHeap<order::Order>,
     sell_orders: BinaryHeap<order::Order>,
+}
+
+#[derive(Clone, Debug)]
+pub struct MatchedOrders {
+    pub taker_order_id: u32,
+    pub maker_order_id: u32,
 }
 
 impl OrderBook {
@@ -16,6 +24,9 @@ impl OrderBook {
     }
 
     pub fn add_order(&mut self, order: order::Order) -> bool {
+        if order.volume == 0 {
+            return false;
+        }
         match order.side {
             order::OrderSide::Buy => {
                 self.buy_orders.push(order);
@@ -27,21 +38,75 @@ impl OrderBook {
         true
     }
 
-    pub fn match_orders(&mut self) -> Vec<order::Order> {
-        let mut matches = Vec::new();
-        while let Some(buy) = self.buy_orders.peek() {
-            if let Some(sell) = self.sell_orders.peek() {
-                if buy.price >= sell.price {
-                    matches.push(self.buy_orders.pop().unwrap());
-                    matches.push(self.sell_orders.pop().unwrap());
-                } else {
-                    break;
-                }
+    pub fn remove_order(&mut self, id: u32) -> bool {
+        let mut found = false;
+
+        // remove the order from the buy orders
+        let mut buy_orders = Vec::new();
+        while let Some(order) = self.buy_orders.pop() {
+            if order.id == id {
+                found = true;
             } else {
-                break;
+                buy_orders.push(order);
             }
         }
-        matches
+        self.buy_orders = BinaryHeap::from(buy_orders);
+
+        // remove the order from the sell orders
+        let mut sell_orders = Vec::new();
+        while let Some(order) = self.sell_orders.pop() {
+            if order.id == id {
+                found = true;
+            } else {
+                sell_orders.push(order);
+            }
+        }
+        self.sell_orders = BinaryHeap::from(sell_orders);
+
+        found
+    }
+
+    // update an order in the orderbook
+    pub fn update_order(&mut self, order: order::Order) -> bool {
+        // if the order is not in the orderbook, return false
+        if !self.remove_order(order.id) {
+            info!("Order not found in orderbook, creating new order");
+        } else {
+            info!("Order found in orderbook, updating order");
+        }
+
+        if order.volume > 0 {
+            self.add_order(order);
+        }
+
+        true
+    }
+
+    // find two orders that match
+    pub fn find_matching_orders(&self) -> Option<MatchedOrders> {
+        let buy = self.buy_orders.peek();
+        let sell = self.sell_orders.peek();
+
+        match (buy, sell) {
+            (Some(buy), Some(sell)) => {
+                if buy.price >= sell.price {
+                    // the order with the lower id is the maker order
+                    if buy.id < sell.id {
+                        return Some(MatchedOrders {
+                            taker_order_id: sell.id,
+                            maker_order_id: buy.id,
+                        });
+                    }
+                    return Some(MatchedOrders {
+                        taker_order_id: buy.id,
+                        maker_order_id: sell.id,
+                    });
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 }
 
@@ -49,10 +114,18 @@ impl OrderBook {
 impl Ord for order::Order {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self.side, other.side) {
-            // buy orders are sorted normally
-            (order::OrderSide::Buy, order::OrderSide::Buy) => self.price.cmp(&other.price),
+            // buy orders are sorted by price, then by id
+            // first in the heap is the highest price, then the lowest id to ensure FIFO
+            (order::OrderSide::Buy, order::OrderSide::Buy) => self
+                .price
+                .cmp(&other.price)
+                .then_with(|| other.id.cmp(&self.id)),
             // sell orders are sorted in reverse
-            (order::OrderSide::Sell, order::OrderSide::Sell) => other.price.cmp(&self.price),
+            // first in the heap is the lowest price, then the lowest id to ensure FIFO
+            (order::OrderSide::Sell, order::OrderSide::Sell) => other
+                .price
+                .cmp(&self.price)
+                .then_with(|| other.id.cmp(&self.id)),
             _ => panic!("Cannot compare buy and sell orders, should be separate heaps"),
         }
     }
@@ -92,8 +165,10 @@ mod tests {
         book.add_order(buy_order);
         book.add_order(sell_order);
 
-        let matches = book.match_orders();
-
-        assert_eq!(matches.len(), 2);
+        let matches = book.find_matching_orders();
+        assert!(matches.is_some());
+        let matches = matches.unwrap();
+        assert_eq!(matches.maker_order_id, 1);
+        assert_eq!(matches.taker_order_id, 2);
     }
 }

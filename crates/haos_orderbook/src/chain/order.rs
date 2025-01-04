@@ -1,12 +1,18 @@
 use alloy::{
-    primitives::{Address, U256},
+    primitives::{Address, TxHash, U256},
     providers::Provider,
     transports::http::{Client, Http},
 };
 use anyhow::Result;
 
 use super::contract::IOrderBook;
-use crate::orderbook::order::{Order, OrderSide};
+use crate::{
+    constants::MATCH_GAS_LIMIT,
+    orderbook::{
+        order::{Order, OrderSide},
+        MatchedOrders,
+    },
+};
 
 pub trait OrderMetadataReader {
     fn get_metadata(
@@ -64,4 +70,35 @@ impl OrderMetadataReader for FHEOrderMetadataReader {
         // return not implemented error
         Err(anyhow::anyhow!("Not implemented"))
     }
+}
+
+pub async fn match_orders<P: Provider<Http<Client>>>(
+    orders: MatchedOrders,
+    wallet: &P,
+    contract_address: Address,
+) -> Result<TxHash> {
+    let contract = IOrderBook::new(contract_address, wallet);
+    let tx_receipt = contract
+        .matchOrders(
+            U256::from(orders.taker_order_id),
+            U256::from(orders.maker_order_id),
+        )
+        .gas(MATCH_GAS_LIMIT)
+        .send()
+        .await?
+        .get_receipt()
+        .await?;
+    if tx_receipt.status() {
+        Ok(tx_receipt.transaction_hash)
+    } else {
+        Err(anyhow::anyhow!("Failed to settle orders"))
+    }
+
+    // if tx_receipt.status() {
+    //     tx
+    //     info!("Orders settled successfully");
+    //     self.pending_matched_orders = Some(orders);
+    // } else {
+    //     warn!("Orders failed to settle");
+    // }
 }
