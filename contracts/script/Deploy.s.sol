@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.25 <0.9.0;
 
-import { EncryptedTokens } from "../src/FHERC20.sol";
+import { EncryptedToken } from "../src/FHERC20.sol";
 
 import { OrderBook } from "../src/OrderBook.sol";
 
@@ -17,13 +17,17 @@ contract Deploy is Script {
 
         vm.startBroadcast(privateKey);
 
-        EncryptedTokens token = new EncryptedTokens("");
-        console2.log("EncryptedTokens deployed at", address(token));
+        EncryptedToken tokenA = new EncryptedToken();
+        console2.log("EncryptedToken A deployed at", address(tokenA));
 
-        OrderBook orderBook = new OrderBook(address(token));
+        EncryptedToken tokenB = new EncryptedToken();
+        console2.log("EncryptedToken B deployed at", address(tokenB));
+
+        OrderBook orderBook = new OrderBook(address(tokenA), address(tokenB));
         console2.log("OrderBook deployed at", address(orderBook));
 
-        token.allowContract(address(orderBook));
+        tokenA.allowContract(address(orderBook));
+        tokenB.allowContract(address(orderBook));
 
         vm.stopBroadcast();
     }

@@ -17,7 +17,6 @@ const server = Bun.serve({
         }
 
         const order = await getOrderById(BigInt(orderId));
-        console.log("Fetched order:", order);
         return new Response(JSON.stringify(order), {
           status: 200,
           headers: { "Content-Type": "application/json" },

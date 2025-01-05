@@ -2,7 +2,10 @@ use std::{env, io, str::FromStr};
 
 use alloy::{
     network::EthereumWallet,
-    providers::{ProviderBuilder, WsConnect},
+    providers::{
+        fillers::{NonceFiller, SimpleNonceManager},
+        ProviderBuilder, WsConnect,
+    },
     signers::local::PrivateKeySigner,
 };
 use anyhow::Result;
@@ -31,6 +34,7 @@ async fn main() -> Result<()> {
 
     let wallet_provider = ProviderBuilder::new()
         .with_recommended_fillers()
+        .filler(NonceFiller::<SimpleNonceManager>::default())
         .wallet(wallet)
         .on_http(config.chain.rpc_url.parse()?);
 

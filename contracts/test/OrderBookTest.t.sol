@@ -3,7 +3,7 @@ pragma solidity >=0.8.25 <0.9.0;
 
 import { Test, console } from "forge-std/src/Test.sol";
 
-import { EncryptedTokens } from "../src/FHERC20.sol";
+import { EncryptedToken } from "../src/FHERC20.sol";
 import { OrderBook, Order, OrderInput } from "../src/OrderBook.sol";
 import { FheEnabled } from "../util/FheHelper.sol";
 import { Permission, PermissionHelper } from "../util/PermissionHelper.sol";
@@ -13,7 +13,8 @@ import { ebool, inEbool, euint32, inEuint32, FHE } from "@fhenixprotocol/contrac
 /// @dev If this is your first time with Forge, read this tutorial in the Foundry Book:
 /// https://book.getfoundry.sh/forge/writing-tests
 contract TokenTest is Test, FheEnabled {
-    EncryptedTokens internal token;
+    EncryptedToken internal tokenA;
+    EncryptedToken internal tokenB;
     OrderBook internal orderBook;
 
     address public owner;
@@ -44,11 +45,13 @@ contract TokenTest is Test, FheEnabled {
         vm.startPrank(owner);
 
         // Instantiate the contract-under-test.
-        token = new EncryptedTokens("");
+        tokenA = new EncryptedToken();
+        tokenB = new EncryptedToken();
 
-        orderBook = new OrderBook(address(token));
+        orderBook = new OrderBook(address(tokenA), address(tokenB));
 
-        token.allowContract(address(orderBook));
+        tokenA.allowContract(address(orderBook));
+        tokenB.allowContract(address(orderBook));
 
         // token.mint("USD", alice, 1000);
         // token.mint("Yes", bob, 1000);

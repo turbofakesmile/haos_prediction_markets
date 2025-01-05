@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { EncryptedTokens } from "./FHERC20.sol";
+import { EncryptedToken } from "./FHERC20.sol";
 import { 
     euint32 as encUint,
     inEuint32 as inEncUint,
@@ -34,17 +34,17 @@ contract OrderBook is Permissioned {
     mapping(uint256 => Order) public orders;
     mapping(uint256 => uint256) public ordersExist;
 
-    EncryptedTokens public encryptedTokens;
+    EncryptedToken public tokenA;
+    EncryptedToken public tokenB;
 
     uint256 public orderCount;
 
     string constant public tokenAName = "Yes";
     string constant public tokenBName = "USD";
 
-    constructor(address _encryptedTokens) {
-        encryptedTokens = EncryptedTokens(_encryptedTokens);
-        // Request authorization from EncryptedTokens contract
-        EncryptedTokens(_encryptedTokens).allowContract(address(this));
+    constructor(address _tokenA, address _tokenB) {
+        tokenA = EncryptedToken(_tokenA);
+        tokenB = EncryptedToken(_tokenB);
     }
 
     function getOrder(Permission calldata permission, uint256 id) public view returns (
@@ -72,10 +72,9 @@ contract OrderBook is Permissioned {
         );
         
         // If order is buy, transfer B (USD) to this contract
-        encryptedTokens.transferFromEncrypted(
+        tokenB.transferFromEncrypted(
             msg.sender,
             address(this),
-            tokenBName,
             FHE.mul(
                 FHE.sub(
                     FHE.asEuint32(1),
@@ -86,10 +85,9 @@ contract OrderBook is Permissioned {
         );
         
         // If order is sell, transfer A (Yes tokens) to this contract
-        encryptedTokens.transferFromEncrypted(
+        tokenA.transferFromEncrypted(
             msg.sender,
             address(this),
-            tokenAName,
             FHE.mul(
                 FHE.asEuint32(orders[id].side),
                 orders[id].amount
@@ -115,7 +113,9 @@ contract OrderBook is Permissioned {
         encUint price = FHE.min(takerOrder.price, makerOrder.price);
 
         ebool orderCanBeFilled = FHE.or(
-            takerPriceEqual, 
+            takerPriceEqual,
+            /// if buy, taker price must be higher than maker price
+            /// if sell, taker price must be lower than maker price
             FHE.xor(takerOrder.side, takerPriceHigher)
         );
         
@@ -131,26 +131,23 @@ contract OrderBook is Permissioned {
         makerOrder.amount = FHE.sub(makerOrder.amount, amount);
 
         // If taker is buy, transfer A (Yes tokens) to taker
-        encryptedTokens.transferFromEncrypted(
+        tokenA.transferFromEncrypted(
             address(this),
-            takerOrder.creator, 
-            tokenAName, 
+            takerOrder.creator,
             FHE.mul(amount, FHE.sub(FHE.asEuint32(1), FHE.asEuint32(takerOrder.side)))
         );
         
         // If taker is sell, transfer A (Yes tokens) to maker
-        encryptedTokens.transferFromEncrypted(
+        tokenA.transferFromEncrypted(
             address(this),
-            makerOrder.creator, 
-            tokenAName, 
+            makerOrder.creator,
             FHE.mul(amount, FHE.asEuint32(takerOrder.side))
         );
         
         // If taker is buy, transfer B (USD) to maker
-        encryptedTokens.transferFromEncrypted(
+        tokenB.transferFromEncrypted(
             address(this),
-            makerOrder.creator, 
-            tokenBName, 
+            makerOrder.creator,
             FHE.mul(
                 amount,
                 FHE.mul(
@@ -161,10 +158,9 @@ contract OrderBook is Permissioned {
         );
         
         // If taker is sell, transfer B (USD) to taker
-        encryptedTokens.transferFromEncrypted(
+        tokenB.transferFromEncrypted(
             address(this),
-            takerOrder.creator, 
-            tokenBName, 
+            takerOrder.creator,
             FHE.mul(
                 amount,
                 FHE.mul(price, FHE.asEuint32(takerOrder.side))
