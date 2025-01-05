@@ -14,15 +14,15 @@ import "@fhenixprotocol/contracts/access/Permissioned.sol";
 error FHERC20NotAuthorized();
 
 struct Order {
-	ebool side; // 0 if buy, 1 if sell
-	encUint amount; // A if side=0, B if side=1
+    ebool side; // 0 if buy, 1 if sell
+    encUint amount; // A if side=0, B if side=1
     encUint price;
-	address creator;
+    address creator;
 }
 
 struct OrderInput {
-	inEbool side; // 0 if buy, 1 if sell
-	inEncUint amount; // A if side=0, B if side=1
+    inEbool side; // 0 if buy, 1 if sell
+    inEncUint amount; // A if side=0, B if side=1
     inEncUint price;
 }
 
@@ -31,7 +31,6 @@ event OrderFilled(uint256 indexed id);
 event OrdersMatched(uint256 indexed takerId, uint256 indexed makerId);
 
 contract OrderBook is Permissioned {
-
     mapping(uint256 => Order) public orders;
     mapping(uint256 => uint256) public ordersExist;
 
@@ -44,6 +43,8 @@ contract OrderBook is Permissioned {
 
     constructor(address _encryptedTokens) {
         encryptedTokens = EncryptedTokens(_encryptedTokens);
+        // Request authorization from EncryptedTokens contract
+        EncryptedTokens(_encryptedTokens).allowContract(address(this));
     }
 
     function getOrder(Permission calldata permission, uint256 id) public view returns (
@@ -69,37 +70,36 @@ contract OrderBook is Permissioned {
             FHE.asEuint32(order.price),
             msg.sender
         );
+        
+        // If order is buy, transfer B (USD) to this contract
+        encryptedTokens.transferFromEncrypted(
+            msg.sender,
+            address(this),
+            tokenBName,
+            FHE.mul(
+                FHE.sub(
+                    FHE.asEuint32(1),
+                    FHE.asEuint32(orders[id].side)
+                ),
+                FHE.mul(orders[id].amount, orders[id].price)
+            )
+        );
+        
+        // If order is sell, transfer A (Yes tokens) to this contract
+        encryptedTokens.transferFromEncrypted(
+            msg.sender,
+            address(this),
+            tokenAName,
+            FHE.mul(
+                FHE.asEuint32(orders[id].side),
+                orders[id].amount
+            )
+        );
+        
         emit OrderPlaced(id);
-        // // if order is buy, transfer B to this contract
-        // encryptedTokens.transferFromEncrypted(
-        //     msg.sender,
-        //     address(this),
-        //     tokenBName,
-        //     FHE.mul(
-        //         FHE.sub(FHE.asEuint32(1),
-        //             FHE.asEuint32(
-        //                 orders[id].side
-        //             )
-        //         ),
-        //         orders[id].amount
-        //     )
-        // );
-        // // if order is sell, transfer A to this contract
-        // encryptedTokens.transferFromEncrypted(
-        //     msg.sender,
-        //     address(this),
-        //     tokenAName,
-        //     FHE.mul(
-        //         FHE.asEuint32(
-        //             orders[id].side
-        //         ),
-        //         orders[id].amount
-        //     )
-        // );
     }
 
     function matchOrders(uint256 takerOrderId, uint256 makerOrderId) public {
-
         require(ordersExist[takerOrderId] != 0, "Taker does not exist");
         require(ordersExist[makerOrderId] != 0, "Maker does not exist");
 
@@ -107,10 +107,8 @@ contract OrderBook is Permissioned {
         Order memory makerOrder = orders[makerOrderId];
 
         ebool sidesDifferent = FHE.xor(takerOrder.side, makerOrder.side);
-
         ebool makerOrderNotFilled = FHE.gt(makerOrder.amount, FHE.asEuint32(0));
         ebool takerOrderNotFilled = FHE.gt(takerOrder.amount, FHE.asEuint32(0));
-
         ebool takerPriceEqual = FHE.eq(takerOrder.price, makerOrder.price);
         ebool takerPriceHigher = FHE.gt(takerOrder.price, makerOrder.price);
 
@@ -119,8 +117,6 @@ contract OrderBook is Permissioned {
         ebool orderCanBeFilled = FHE.or(
             takerPriceEqual, 
             FHE.xor(takerOrder.side, takerPriceHigher)
-            /// if buy, taker price must be higher than maker price
-            /// if sell, taker price must be lower than maker price
         );
         
         FHE.req(
@@ -129,49 +125,51 @@ contract OrderBook is Permissioned {
                 FHE.and(sidesDifferent, orderCanBeFilled)
             )
         );
-        // fill order
 
         encUint amount = FHE.min(takerOrder.amount, makerOrder.amount);
         takerOrder.amount = FHE.sub(takerOrder.amount, amount);
         makerOrder.amount = FHE.sub(makerOrder.amount, amount);
 
-        // EncryptedErc20.transfer(side^1, takerTakeAmount, takerOrder.creator);
-        // EncryptedErc20.transfer(side, takerMakeAmount, makerOrder.creator);
-
-        // if taker is buy, taker takes A
-        // encryptedTokens.transferFromEncrypted(
-        //     address(this),
-        //     takerOrder.creator, 
-        //     tokenAName, 
-        //     FHE.mul(amount, FHE.asEuint32(makerOrder.side))
-        // );
-        // // if taker is sell, maker takes A
-        // encryptedTokens.transferFromEncrypted(
-        //     address(this),
-        //     makerOrder.creator, 
-        //     tokenAName, 
-        //     FHE.mul(amount, FHE.asEuint32(takerOrder.side))
-        // );
-        // // if taker is buy, maker takes B
-        // encryptedTokens.transferFromEncrypted(
-        //     address(this),
-        //     makerOrder.creator, 
-        //     tokenBName, 
-        //     FHE.mul(
-        //         amount, 
-        //         FHE.mul(price, FHE.asEuint32(makerOrder.side))
-        //     )
-        // );
-        // // if taker is sell, taker takes B
-        // encryptedTokens.transferFromEncrypted(
-        //     address(this),
-        //     takerOrder.creator, 
-        //     tokenBName, 
-        //     FHE.mul(
-        //         amount, 
-        //         FHE.mul(price, FHE.asEuint32(takerOrder.side))
-        //     )
-        // );
+        // If taker is buy, transfer A (Yes tokens) to taker
+        encryptedTokens.transferFromEncrypted(
+            address(this),
+            takerOrder.creator, 
+            tokenAName, 
+            FHE.mul(amount, FHE.sub(FHE.asEuint32(1), FHE.asEuint32(takerOrder.side)))
+        );
+        
+        // If taker is sell, transfer A (Yes tokens) to maker
+        encryptedTokens.transferFromEncrypted(
+            address(this),
+            makerOrder.creator, 
+            tokenAName, 
+            FHE.mul(amount, FHE.asEuint32(takerOrder.side))
+        );
+        
+        // If taker is buy, transfer B (USD) to maker
+        encryptedTokens.transferFromEncrypted(
+            address(this),
+            makerOrder.creator, 
+            tokenBName, 
+            FHE.mul(
+                amount,
+                FHE.mul(
+                    price,
+                    FHE.sub(FHE.asEuint32(1), FHE.asEuint32(takerOrder.side))
+                )
+            )
+        );
+        
+        // If taker is sell, transfer B (USD) to taker
+        encryptedTokens.transferFromEncrypted(
+            address(this),
+            takerOrder.creator, 
+            tokenBName, 
+            FHE.mul(
+                amount,
+                FHE.mul(price, FHE.asEuint32(takerOrder.side))
+            )
+        );
 
         orders[takerOrderId] = takerOrder;
         orders[makerOrderId] = makerOrder;
@@ -179,7 +177,5 @@ contract OrderBook is Permissioned {
         emit OrderFilled(takerOrderId);
         emit OrderFilled(makerOrderId);
         emit OrdersMatched(takerOrderId, makerOrderId);
-
     }
-
 }
