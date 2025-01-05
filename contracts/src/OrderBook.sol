@@ -106,7 +106,7 @@ contract OrderBook is Permissioned {
         Order memory takerOrder = orders[takerOrderId];
         Order memory makerOrder = orders[makerOrderId];
 
-        ebool sidesDifferent = FHE.not(FHE.xor(takerOrder.side, makerOrder.side));
+        ebool sidesDifferent = FHE.xor(takerOrder.side, makerOrder.side);
 
         ebool makerOrderNotFilled = FHE.gt(makerOrder.amount, FHE.asEuint32(0));
         ebool takerOrderNotFilled = FHE.gt(takerOrder.amount, FHE.asEuint32(0));
