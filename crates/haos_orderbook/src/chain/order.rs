@@ -67,10 +67,8 @@ pub struct FHEOrderMetadataReader {
 }
 
 impl FHEOrderMetadataReader {
-    pub fn new() -> Self {
-        Self {
-            api_url: "http://localhost:3000".to_string(),
-        }
+    pub fn new(api_url: String) -> Self {
+        Self { api_url }
     }
 }
 
@@ -129,12 +127,4 @@ pub async fn match_orders<P: Provider<Http<Client>>>(
     } else {
         Err(anyhow::anyhow!("Failed to settle orders"))
     }
-
-    // if tx_receipt.status() {
-    //     tx
-    //     info!("Orders settled successfully");
-    //     self.pending_matched_orders = Some(orders);
-    // } else {
-    //     warn!("Orders failed to settle");
-    // }
 }

@@ -1,2 +1,3 @@
 target/
 orderbook.abi
+.env

@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  order-scanner:
+    build:
+      context: ./typescript/order-scanner
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - CONTRACT_ADDRESS=${CONTRACT_ADDRESS}
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+
+  haos-orderbook:
+    build:
+      context: .
+      dockerfile: crates/haos_orderbook/Dockerfile
+    environment:
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - START_BLOCK=${START_BLOCK}
+      - CONTRACT_ADDRESS=${CONTRACT_ADDRESS}
+      # Override the default localhost URL to point to the order-scanner service
+      - FHE_DECRYPTION_API_URL=http://order-scanner:3000
+    depends_on:
+      order-scanner:
+        condition: service_healthy

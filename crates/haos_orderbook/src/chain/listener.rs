@@ -25,7 +25,7 @@ impl<'a, P: Provider<PubSubFrontend>, H: OrderHandler> OrderListenerBuilder<'a, 
             provider,
             address: None,
             handlers: Vec::new(),
-            start_block: 19636,
+            start_block: 1,
         }
     }
 

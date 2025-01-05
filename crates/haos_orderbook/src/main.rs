@@ -17,25 +17,17 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> Result<()> {
     let config = resolve_config();
     init_tracing();
-    // let orderbook = OrderBook::new();
 
     let ws_provider = ProviderBuilder::new()
         .on_ws(WsConnect::new(config.chain.rpc_url_ws))
         .await?;
 
-    // let http_provider = ProviderBuilder::new().on_http(config.chain.rpc_url.parse()?);
+    let mocked_order_metadata_reader: FHEOrderMetadataReader =
+        FHEOrderMetadataReader::new(config.fhe_decryption.api_url.clone());
 
-    let mocked_order_metadata_reader: FHEOrderMetadataReader = FHEOrderMetadataReader::new();
-
-    let wallet = EthereumWallet::from(
-        PrivateKeySigner::from_str(
-            // load env var PRIVATE_KEY
-            env::var("PRIVATE_KEY")
-                .expect("PRIVATE_KEY env var not set")
-                .as_str(),
-        )
-        .unwrap(),
-    );
+    let wallet = EthereumWallet::from(PrivateKeySigner::from_str(
+        &config.chain.private_key.as_str(),
+    )?);
 
     let wallet_provider = ProviderBuilder::new()
         .with_recommended_fillers()
@@ -43,8 +35,8 @@ async fn main() -> Result<()> {
         .on_http(config.chain.rpc_url.parse()?);
 
     let mut listener = OrderListener::builder(&ws_provider)
+        .with_start_block(config.chain.orderbook_start_block)
         .with_address(config.chain.orderbook_address)
-        // .with_handler(LoggingOrderHandler::new(mocked_order_metadata_reader))
         .with_handler(OrderManager::new(
             mocked_order_metadata_reader,
             wallet_provider,
